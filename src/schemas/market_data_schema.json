@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Esquema de Datos de Mercado",
+  "description": "Esquema para validar la estructura de datos de mercado financiero.",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "description": "Símbolo del instrumento financiero.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+    },
+    "timestamp": {
+      "description": "Fecha y hora del dato en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "open": {
+      "description": "Precio de apertura.",
+      "type": "number",
+      "minimum": 0
+    },
+    "high": {
+      "description": "Precio máximo.",
+      "type": "number",
+      "minimum": 0
+    },
+    "low": {
+      "description": "Precio mínimo.",
+      "type": "number",
+      "minimum": 0
+    },
+    "close": {
+      "description": "Precio de cierre.",
+      "type": "number",
+      "minimum": 0
+    },
+    "volume": {
+      "description": "Volumen negociado.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "adjusted_close": {
+      "description": "Precio de cierre ajustado.",
+      "type": "number",
+      "minimum": 0
+    },
+    "dividend_amount": {
+      "description": "Monto de dividendo.",
+      "type": "number",
+      "minimum": 0
+    },
+    "split_coefficient": {
+      "description": "Coeficiente de split.",
+      "type": "number",
+      "minimum": 0
+    },
+    "exchange": {
+      "description": "Mercado de negociación.",
+      "type": "string",
+      "enum": ["NYSE", "NASDAQ", "LSE", "TSE", "HKEX", "EURONEXT", "BM&FBOVESPA", "OTHER"]
+    },
+    "currency": {
+      "description": "Moneda del instrumento.",
+      "type": "string",
+      "enum": ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "BRL", "MXN"]
+    },
+    "metadata": {
+      "description": "Metadatos adicionales del instrumento.",
+      "type": "object",
+      "properties": {
+        "sector": {
+          "type": "string",
+          "enum": ["TECHNOLOGY", "FINANCE", "HEALTHCARE", "ENERGY", "UTILITIES", "CONSUMER", "INDUSTRIALS", "OTHER"]
+        },
+        "industry": {
+          "type": "string"
+        },
+        "market_cap": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "description": "Fecha y hora de creación del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "description": "Fecha y hora de última actualización del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "symbol",
+    "timestamp",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "created_at"
+  ],
+  "additionalProperties": false
+}

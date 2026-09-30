@@ -1,0 +1,344 @@
+{
+  "environment": "production",
+  "pipeline": {
+    "name": "financial_analysis_pipeline",
+    "version": "1.0.0",
+    "enabled": true,
+    "max_retries": 5,
+    "retry_delay_seconds": 60,
+    "retry_backoff_multiplier": 2,
+    "timeout_seconds": 7200
+  },
+  "sources": {
+    "bank_transactions": {
+      "type": "api",
+      "url": "https://api.bankcorp.com/v1/transactions",
+      "auth": {
+        "type": "bearer",
+        "token": "${BANK_API_TOKEN}"
+      },
+      "pagination": {
+        "enabled": true,
+        "page_size": 5000,
+        "max_pages": 200
+      },
+      "timeout_seconds": 120,
+      "rate_limit": {
+        "requests_per_minute": 60,
+        "burst_size": 10
+      },
+      "circuit_breaker": {
+        "enabled": true,
+        "failure_threshold": 5,
+        "recovery_timeout_seconds": 300
+      }
+    },
+    "market_data": {
+      "type": "api",
+      "url": "https://api.marketdata.com/v2",
+      "auth": {
+        "type": "api_key",
+        "key": "${MARKET_API_KEY}",
+        "header": "X-API-Key"
+      },
+      "endpoints": {
+        "stocks": "/stocks/realtime",
+        "indices": "/indices",
+        "forex": "/forex",
+        "commodities": "/commodities",
+        "derivatives": "/derivatives"
+      },
+      "timeout_seconds": 90,
+      "retry_on_failure": true,
+      "retry_count": 3
+    },
+    "financial_news": {
+      "type": "api",
+      "url": "https://api.financialnews.com/v3",
+      "auth": {
+        "type": "oauth2",
+        "client_id": "${NEWS_CLIENT_ID}",
+        "client_secret": "${NEWS_CLIENT_SECRET}",
+        "token_url": "https://auth.financialnews.com/oauth/token"
+      },
+      "filters": {
+        "categories": ["markets", "economy", "banking", "crypto", " Commodities", "forex"],
+        "language": "en",
+        "sentiment_analysis_enabled": true,
+        "relevance_score_min": 0.7
+      },
+      "timeout_seconds": 60,
+      "max_results_per_query": 1000
+    }
+  },
+  "storage": {
+    "raw_zone": {
+      "type": "s3",
+      "bucket": "fin-analytics-prod-raw",
+      "path_prefix": "raw/",
+      "format": "parquet",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["source", "year", "month", "day", "hour"]
+      },
+      "compression": "zstd",
+      "buffering": {
+        "enabled": true,
+        "size_mb": 128,
+        "flush_interval_seconds": 300
+      }
+    },
+    "processed_zone": {
+      "type": "s3",
+      "bucket": "fin-analytics-prod-processed",
+      "path_prefix": "processed/",
+      "format": "parquet",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["data_type", "year", "month", "day", "hour", "source"]
+      },
+      "compression": "zstd",
+      "row_group_size_mb": 128
+    },
+    "curated_zone": {
+      "type": "delta",
+      "bucket": "fin-analytics-prod-curated",
+      "path_prefix": "curated/",
+      "format": "delta",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["entity_type", "year", "month", "day"]
+      },
+      "optimize_on_write": true,
+      "optimize_on_read": true,
+      "schema_enforcement": "strict",
+      "vacuum": {
+        "enabled": true,
+        "retention_days": 7,
+        "dry_run": false
+      },
+      "cdf": {
+        "enabled": true,
+        "change_data_feed": true
+      }
+    }
+  },
+  "data_quality": {
+    "enabled": true,
+    "strict_mode": true,
+    "rules": {
+      "transaction_rules": {
+        "min_amount": -5000000,
+        "max_amount": 5000000,
+        "required_fields": ["transaction_id", "timestamp", "amount", "currency", "account_id", "merchant_id"],
+        "allowed_currencies": ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD"],
+        "null_tolerance": {
+          "transaction_id": 0,
+          "amount": 0,
+          "timestamp": 0,
+          "merchant_id": 0.01
+        },
+        "duplication_check": {
+          "enabled": true,
+          "key_fields": ["transaction_id", "account_id"],
+          "action": "quarantine"
+        },
+        "anomaly_detection": {
+          "enabled": true,
+          "method": "isolation_forest",
+          "contamination": 0.01
+        }
+      },
+      "market_data_rules": {
+        "price_range": {
+          "min": 0.01,
+          "max": 5000000
+        },
+        "volume_min": 0,
+        "required_fields": ["symbol", "timestamp", "open_price", "high_price", "low_price", "close_price", "volume"],
+        "outlier_detection": {
+          "enabled": true,
+          "method": "zscore",
+          "threshold": 4.0
+        },
+        "freshness_seconds": 60,
+        "gap_detection": {
+          "enabled": true,
+          "max_gap_minutes": 15
+        }
+      },
+      "news_rules": {
+        "required_fields": ["article_id", "published_at", "title", "source", "url", "authors"],
+        "min_title_length": 15,
+        "max_title_length": 300,
+        "language_filter": ["en", "es", "fr", "de", "ja", "zh"],
+        "sentiment_range": {
+          "min": -1.0,
+          "max": 1.0
+        },
+        "duplicate_detection": {
+          "enabled": true,
+          "similarity_threshold": 0.9
+        }
+      }
+    },
+    "thresholds": {
+      "min_success_rate": 0.99,
+      "max_null_rate": 0.02,
+      "max_duplicate_rate": 0.005,
+      "max_error_rate": 0.01,
+      "alert_on_failure": true,
+      "stop_pipeline_on_critical_failure": true
+    },
+    "quarantine": {
+      "enabled": true,
+      "bucket": "fin-analytics-prod-quarantine",
+      "retention_days": 90,
+      "auto_cleanup_enabled": true
+    }
+  },
+  "security": {
+    "encryption": {
+      "at_rest": {
+        "enabled": true,
+        "algorithm": "AES-256-GCM",
+        "kms_key_id": "arn:aws:kms:us-east-1:123456789012:key/prod-key-001",
+        "key_rotation_days": 90
+      },
+      "in_transit": {
+        "enabled": true,
+        "tls_version": "1.3",
+        "verify_certificates": true
+      },
+      "column_level": {
+        "enabled": true,
+        "encrypted_columns": ["account_number", "amount", "transaction_details"]
+      }
+    },
+    "token_expiry_seconds": 1800,
+    "max_failed_auth_attempts": 3,
+    "ip_whitelist": {
+      "enabled": true,
+      "allowed_ips": ["10.0.0.0/8", "172.16.0.0/12"]
+    },
+    "audit_logging": {
+      "enabled": true,
+      "bucket": "fin-analytics-prod-audit",
+      "retention_days": 365,
+      "immutable": true
+    },
+    "pii_handling": {
+      "masking_enabled": true,
+      "pii_fields": ["account_number", "ssn", "email", "phone"],
+      "masking_algorithm": "SHA-256"
+    }
+  },
+  "orchestration": {
+    "airflow": {
+      "dag_schedule": "0 */3 * * *",
+      "max_active_runs": 2,
+      "catchup": false,
+      "concurrency": 8,
+      "pool": "production_pool",
+      "priority_weight": 10,
+      "sla_minutes": 120
+    },
+    "dependencies": {
+      "bank_transactions": [],
+      "market_data": ["bank_transactions"],
+      "financial_news": ["market_data"]
+    },
+    "windowing": {
+      "type": "tumbling",
+      "size_hours": 3,
+      "offset_hours": 0
+    },
+    "backfill": {
+      "enabled": true,
+      "max_days": 30,
+      "parallel_tasks": 4
+    }
+  },
+  "monitoring": {
+    "logging": {
+      "level": "INFO",
+      "format": "json",
+      "destination": "cloudwatch",
+      "log_group": "/aws/fin-analytics/prod",
+      "retention_days": 30
+    },
+    "metrics": {
+      "enabled": true,
+      "destination": "cloudwatch",
+      "namespace": "FinAnalytics/Prod",
+      "dimensions": ["Environment", "Pipeline", "Source", "Stage"],
+      "detailed_metrics": true
+    },
+    "alerts": {
+      "enabled": true,
+      "sns_topic": "arn:aws:sns:us-east-1:123456789012:prod-alerts-topic",
+      "pagerduty_integration": true,
+      "escalation_policy": "prod_escalation"
+    },
+    "tracing": {
+      "enabled": true,
+      "service_name": "financial-analysis-pipeline-prod",
+      "sample_rate": 0.1,
+      "xray_enabled": true
+    },
+    "dashboards": {
+      "enabled": true,
+      "grafana_url": "https://grafana.fin-analytics.com",
+      "refresh_interval_seconds": 30
+    }
+  },
+  "processing": {
+    "spark": {
+      "master": "spark://prod-master:7077",
+      "app_name": "financial_analysis_prod",
+      "executor": {
+        "instances": 10,
+        "cores": 4,
+        "memory": "8g"
+      },
+      "dynamic_allocation": {
+        "enabled": true,
+        "min_executors": 5,
+        "max_executors": 20
+      },
+      "shuffle_partitions": 200,
+      "max_result_size": "4g",
+      "speculation": {
+        "enabled": true,
+        "multiplier": 1.5
+      }
+    },
+    "batch": {
+      "size": 50000,
+      "parallelism": 16
+    },
+    "streaming": {
+      "enabled": true,
+      "checkpoint_location": "s3://fin-analytics-prod-checkpoints/",
+      "trigger_interval_seconds": 60
+    }
+  },
+  "cost_optimization": {
+    "s3": {
+      "lifecycle_policies": {
+        "raw_to_glacier_days": 90,
+        "processed_delete_days": 365
+      },
+      "intelligent_tiering": true
+    },
+    "compute": {
+      "spot_instances": true,
+      "auto_scaling": true,
+      "downscale_after_minutes": 30
+    },
+    "data_transfer": {
+      "optimize_cross_zone": true,
+      "use_accelerate_endpoint": true
+    }
+  }
+}

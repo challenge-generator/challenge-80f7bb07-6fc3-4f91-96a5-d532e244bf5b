@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Esquema de Transacciones Bancarias",
+  "description": "Esquema para validar la estructura de datos de transacciones bancarias.",
+  "type": "object",
+  "properties": {
+    "transaction_id": {
+      "description": "Identificador único de la transacción.",
+      "type": "string",
+      "format": "uuid",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "account_id": {
+      "description": "Identificador de la cuenta bancaria.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50
+    },
+    "transaction_date": {
+      "description": "Fecha y hora de la transacción en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "amount": {
+      "description": "Monto de la transacción.",
+      "type": "number",
+      "minimum": -1000000,
+      "maximum": 1000000
+    },
+    "currency": {
+      "description": "Moneda de la transacción.",
+      "type": "string",
+      "enum": ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "MXN", "BRL"]
+    },
+    "transaction_type": {
+      "description": "Tipo de transacción.",
+      "type": "string",
+      "enum": ["DEPOSIT", "WITHDRAWAL", "TRANSFER", "PAYMENT", "FEE", "INTEREST"]
+    },
+    "description": {
+      "description": "Descripción de la transacción.",
+      "type": "string",
+      "maxLength": 200
+    },
+    "merchant": {
+      "description": "Información del comercio asociado a la transacción.",
+      "type": "object",
+      "properties": {
+        "merchant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "merchant_name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "merchant_category": {
+          "type": "string",
+          "enum": ["RETAIL", "GROCERY", "TRAVEL", "ENTERTAINMENT", "HEALTH", "UTILITIES", "OTHER"]
+        }
+      },
+      "required": ["merchant_id", "merchant_name"]
+    },
+    "location": {
+      "description": "Ubicación geográfica de la transacción.",
+      "type": "object",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "country": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        },
+        "city": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "required": ["latitude", "longitude"]
+    },
+    "status": {
+      "description": "Estado de la transacción.",
+      "type": "string",
+      "enum": ["PENDING", "COMPLETED", "FAILED", "REVERSED"]
+    },
+    "metadata": {
+      "description": "Metadatos adicionales de la transacción.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "description": "Fecha y hora de creación del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "description": "Fecha y hora de última actualización del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "transaction_id",
+    "account_id",
+    "transaction_date",
+    "amount",
+    "currency",
+    "transaction_type",
+    "status",
+    "created_at"
+  ],
+  "additionalProperties": false
+}

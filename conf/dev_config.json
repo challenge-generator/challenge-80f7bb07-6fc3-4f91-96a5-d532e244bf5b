@@ -1,0 +1,237 @@
+{
+  "environment": "development",
+  "pipeline": {
+    "name": "financial_analysis_pipeline",
+    "version": "1.0.0",
+    "enabled": true,
+    "max_retries": 3,
+    "retry_delay_seconds": 30,
+    "retry_backoff_multiplier": 2,
+    "timeout_seconds": 3600
+  },
+  "sources": {
+    "bank_transactions": {
+      "type": "api",
+      "url": "http://localhost:8080/api/v1/transactions",
+      "auth": {
+        "type": "bearer",
+        "token": "dev_token_abc123xyz789"
+      },
+      "pagination": {
+        "enabled": true,
+        "page_size": 1000,
+        "max_pages": 50
+      },
+      "timeout_seconds": 60,
+      "rate_limit": {
+        "requests_per_minute": 120,
+        "burst_size": 20
+      }
+    },
+    "market_data": {
+      "type": "api",
+      "url": "http://localhost:8081/api/v1/market",
+      "auth": {
+        "type": "api_key",
+        "key": "dev_market_key_xyz456",
+        "header": "X-API-Key"
+      },
+      "endpoints": {
+        "stocks": "/stocks",
+        "indices": "/indices",
+        "forex": "/forex",
+        "commodities": "/commodities"
+      },
+      "timeout_seconds": 45,
+      "retry_on_failure": true
+    },
+    "financial_news": {
+      "type": "api",
+      "url": "http://localhost:8082/api/v1/news",
+      "auth": {
+        "type": "basic",
+        "username": "dev_news_user",
+        "password": "dev_news_pass_encrypted"
+      },
+      "filters": {
+        "categories": ["markets", "economy", "banking", "crypto"],
+        "language": "en",
+        "sentiment_analysis_enabled": true
+      },
+      "timeout_seconds": 30,
+      "max_results_per_query": 500
+    }
+  },
+  "storage": {
+    "raw_zone": {
+      "type": "s3",
+      "bucket": "fin-analytics-dev-raw",
+      "path_prefix": "raw/",
+      "format": "parquet",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["source", "year", "month", "day"]
+      },
+      "compression": "snappy"
+    },
+    "processed_zone": {
+      "type": "s3",
+      "bucket": "fin-analytics-dev-processed",
+      "path_prefix": "processed/",
+      "format": "parquet",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["data_type", "year", "month", "day", "hour"]
+      },
+      "compression": "zstd"
+    },
+    "curated_zone": {
+      "type": "s3",
+      "bucket": "fin-analytics-dev-curated",
+      "path_prefix": "curated/",
+      "format": "delta",
+      "partitioning": {
+        "enabled": true,
+        "fields": ["entity_type", "year", "month", "day"]
+      },
+      "optimize_on_write": true,
+      "schema_enforcement": "strict"
+    }
+  },
+  "data_quality": {
+    "enabled": true,
+    "rules": {
+      "transaction_rules": {
+        "min_amount": -1000000,
+        "max_amount": 1000000,
+        "required_fields": ["transaction_id", "timestamp", "amount", "currency", "account_id"],
+        "allowed_currencies": ["USD", "EUR", "GBP", "JPY", "CHF"],
+        "null_tolerance": {
+          "transaction_id": 0,
+          "amount": 0,
+          "timestamp": 0
+        },
+        "duplication_check": {
+          "enabled": true,
+          "key_fields": ["transaction_id"],
+          "action": "quarantine"
+        }
+      },
+      "market_data_rules": {
+        "price_range": {
+          "min": 0.01,
+          "max": 1000000
+        },
+        "volume_min": 0,
+        "required_fields": ["symbol", "timestamp", "close_price", "volume"],
+        "outlier_detection": {
+          "enabled": true,
+          "method": "iqr",
+          "threshold": 3.0
+        },
+        "freshness_seconds": 300
+      },
+      "news_rules": {
+        "required_fields": ["article_id", "published_at", "title", "source"],
+        "min_title_length": 10,
+        "max_title_length": 500,
+        "language_filter": ["en", "es", "fr", "de"],
+        "sentiment_range": {
+          "min": -1.0,
+          "max": 1.0
+        }
+      }
+    },
+    "thresholds": {
+      "min_success_rate": 0.95,
+      "max_null_rate": 0.05,
+      "max_duplicate_rate": 0.01,
+      "alert_on_failure": true
+    },
+    "quarantine": {
+      "enabled": true,
+      "bucket": "fin-analytics-dev-quarantine",
+      "retention_days": 30
+    }
+  },
+  "security": {
+    "encryption": {
+      "at_rest": {
+        "enabled": true,
+        "algorithm": "AES-256-GCM",
+        "kms_key_id": "arn:aws:kms:us-east-1:123456789012:key/dev-key-001"
+      },
+      "in_transit": {
+        "enabled": true,
+        "tls_version": "1.2",
+        "verify_certificates": false
+      }
+    },
+    "token_expiry_seconds": 3600,
+    "max_failed_auth_attempts": 5,
+    "audit_logging": {
+      "enabled": true,
+      "bucket": "fin-analytics-dev-audit",
+      "retention_days": 90
+    }
+  },
+  "orchestration": {
+    "airflow": {
+      "dag_schedule": "0 */6 * * *",
+      "max_active_runs": 1,
+      "catchup": false,
+      "concurrency": 4,
+      "pool": "default_pool"
+    },
+    "dependencies": {
+      "bank_transactions": [],
+      "market_data": ["bank_transactions"],
+      "financial_news": ["market_data"]
+    },
+    "windowing": {
+      "type": "sliding",
+      "size_hours": 6,
+      "step_hours": 1
+    }
+  },
+  "monitoring": {
+    "logging": {
+      "level": "DEBUG",
+      "format": "json",
+      "destination": "cloudwatch",
+      "log_group": "/aws/fin-analytics/dev"
+    },
+    "metrics": {
+      "enabled": true,
+      "destination": "cloudwatch",
+      "namespace": "FinAnalytics/Dev",
+      "dimensions": ["Environment", "Pipeline", "Source"]
+    },
+    "alerts": {
+      "enabled": false,
+      "sns_topic": "arn:aws:sns:us-east-1:123456789012:dev-alerts-topic"
+    },
+    "tracing": {
+      "enabled": true,
+      "service_name": "financial-analysis-pipeline-dev",
+      "sample_rate": 1.0
+    }
+  },
+  "processing": {
+    "spark": {
+      "master": "local[*]",
+      "app_name": "financial_analysis_dev",
+      "executor": {
+        "instances": 2,
+        "cores": 2,
+        "memory": "2g"
+      },
+      "shuffle_partitions": 8,
+      "max_result_size": "1g"
+    },
+    "batch": {
+      "size": 10000,
+      "parallelism": 4
+    }
+  }
+}

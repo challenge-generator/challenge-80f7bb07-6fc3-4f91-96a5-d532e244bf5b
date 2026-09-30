@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Esquema de Noticias Financieras",
+  "description": "Esquema para validar la estructura de datos de noticias financieras.",
+  "type": "object",
+  "properties": {
+    "news_id": {
+      "description": "Identificador único de la noticia.",
+      "type": "string",
+      "format": "uuid",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "title": {
+      "description": "Título de la noticia.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "content": {
+      "description": "Contenido de la noticia.",
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "description": "Fuente de la noticia.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "author": {
+      "description": "Autor de la noticia.",
+      "type": "string",
+      "maxLength": 100
+    },
+    "published_date": {
+      "description": "Fecha y hora de publicación en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "url": {
+      "description": "URL de la noticia.",
+      "type": "string",
+      "format": "uri",
+      "maxLength": 500
+    },
+    "symbols": {
+      "description": "Símbolos financieros mencionados en la noticia.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "sentiment": {
+      "description": "Sentimiento asociado a la noticia.",
+      "type": "string",
+      "enum": ["POSITIVE", "NEGATIVE", "NEUTRAL", "MIXED"]
+    },
+    "sentiment_score": {
+      "description": "Puntuación de sentimiento.",
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "metadata": {
+      "description": "Metadatos adicionales de la noticia.",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["MARKET", "ECONOMY", "POLITICS", "TECHNOLOGY", "ENERGY", "HEALTHCARE", "OTHER"]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["PERSON", "ORGANIZATION", "LOCATION", "EVENT"]
+              }
+            },
+            "required": ["name", "type"]
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "created_at": {
+      "description": "Fecha y hora de creación del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "description": "Fecha y hora de última actualización del registro en formato ISO 8601.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "news_id",
+    "title",
+    "content",
+    "source",
+    "published_date",
+    "created_at"
+  ],
+  "additionalProperties": false
+}

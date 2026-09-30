@@ -1,0 +1,30 @@
+apache-airflow==2.9.3
+pandas==2.2.2
+pyspark==3.5.1
+boto3==1.34.120
+pyarrow==16.1.0
+pytest==8.2.0
+jsonschema==4.22.0
+cryptography==42.0.8
+python-dotenv==1.0.1
+
+# Dependencias adicionales para manejo de esquemas y validación
+fastjsonschema==2.19.1
+python-dateutil==2.9.0.post0
+pytz==2024.1
+
+# Dependencias para manejo de datos sensibles y seguridad
+aws-encryption-sdk==3.1.2
+pyjwt==2.8.0
+
+# Dependencias para logging y monitoreo
+structlog==24.1.0
+colorama==0.4.6
+
+# Dependencias para manejo de particionamiento y formatos columnares
+delta-rs==0.17.0
+s3fs==2024.3.1
+
+# Dependencias para orquestación avanzada
+apache-airflow-providers-amazon==8.19.0
+apache-airflow-providers-apache-spark==4.7.0

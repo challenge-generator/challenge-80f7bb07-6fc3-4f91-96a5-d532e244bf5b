@@ -1,0 +1,98 @@
+@startuml FinancialDataPlatformArchitecture
+!theme plain
+
+skinparam componentStyle uml2
+
+package "Fuentes de Datos" {
+    component "Transacciones Bancarias" as BankDB #LightBlue
+    component "Datos de Mercado" as MarketAPI #LightGreen
+    component "Noticias Financieras" as NewsAPI #LightYellow
+    component "Sistemas de Terceros" as ThirdParty #LightGray
+}
+
+package "Capa de Ingesta (Extract)" {
+    component "Bank Transactions Reader" as BankReader #LightBlue
+    component "Market Data Reader" as MarketReader #LightGreen
+    component "Financial News Reader" as NewsReader #LightYellow
+    component "Third Party Integrator" as ThirdPartyReader #LightGray
+}
+
+package "Capa de Transformación (Transform)" {
+    component "Data Quality Rules" as QualityRules #Orange
+    component "Financial Data Transformer" as Transformer #Gold
+    component "Data Validation Engine" as Validation #Red
+}
+
+package "Capa de Carga (Load)" {
+    component "Data Writer" as Writer #LightGreen
+    component "Partition Manager" as Partitioner #Purple
+    component "Encryption Handler" as Encryptor #DarkBlue
+}
+
+package "Almacenamiento" {
+    component "Raw Zone (S3)" as RawZone #Gray
+    component "Processed Zone (S3)" as ProcessedZone #Silver
+    component "Curated Zone (Redshift)" as CuratedZone #Gold
+    database "Data Catalog" as Catalog #White
+}
+
+package "Orquestación" {
+    component "Airflow DAG" as Orchestrator #LightBlue
+    component "Step Functions" as StepFunctions #LightGreen
+}
+
+package "Seguridad" {
+    component "KMS Encryption" as KMS #DarkBlue
+    component "IAM Roles" as IAM #DarkGray
+    component "VPC Endpoints" as VPC #DarkGreen
+}
+
+package "Monitoreo" {
+    component "CloudWatch" as Monitoring #LightYellow
+    component "Data Quality Dashboard" as QualityDash #Orange
+}
+
+BankDB -down-> BankReader : JDBC
+MarketAPI -down-> MarketReader : REST API
+NewsAPI -down-> NewsReader : REST API
+ThirdParty -down-> ThirdPartyReader : Webhook
+
+BankReader -down-> QualityRules : Raw Data
+MarketReader -down-> QualityRules
+NewsReader -down-> QualityRules
+ThirdPartyReader -down-> QualityRules
+
+QualityRules -down-> Transformer : Validated Data
+Transformer -down-> Validation : Transformed Data
+Validation -down-> Writer : Quality Passed
+
+Writer -down-> Partitioner : Partitioned Data
+Partitioner -down-> Encryptor : Encrypted Data
+
+Encryptor -up-> RawZone : Write Raw
+Encryptor -up-> ProcessedZone : Write Processed
+Encryptor -up-> CuratedZone : Write Curated
+
+Orchestrator -up-> BankReader : Trigger
+Orchestrator -up-> MarketReader : Trigger
+Orchestrator -up-> NewsReader : Trigger
+Orchestrator -up-> ThirdPartyReader : Trigger
+Orchestrator -up-> QualityRules : Trigger
+Orchestrator -up-> Transformer : Trigger
+Orchestrator -up-> Writer : Trigger
+
+KMS -up-> Encryptor : Encrypt/Decrypt
+IAM -up-> RawZone : Access Control
+IAM -up-> ProcessedZone : Access Control
+IAM -up-> CuratedZone : Access Control
+VPC -up-> BankDB : Secure Connection
+
+Monitoring -up-> Orchestrator : Monitor
+Monitoring -up-> Writer : Monitor
+QualityDash -up-> Validation : Quality Metrics
+
+RawZone -right-> Catalog : Metadata
+ProcessedZone -right-> Catalog : Metadata
+CuratedZone -right-> Catalog : Metadata
+
+@enduml
